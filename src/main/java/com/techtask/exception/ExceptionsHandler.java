@@ -10,7 +10,7 @@ public class ExceptionsHandler {
 
     @ExceptionHandler(WalletNotFoundException.class)
     public ResponseEntity<Object> handleWalletNotFoundException(WalletNotFoundException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.OK);
     }
 
     @ExceptionHandler(InvalidJsonException.class)

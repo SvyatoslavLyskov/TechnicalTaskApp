@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/wallets")
+@RequestMapping
 @RequiredArgsConstructor
 public class WalletController {
     private final WalletService walletService;
 
-    @PostMapping
+    @PostMapping(value = "/api/v1/wallets")
     public ResponseEntity<String> updateWalletBalance(@RequestBody WalletUpdateRequest request) {
         try {
             walletService.updateWalletBalance(request.getWalletId(), request.getOperationType(), request.getAmount());
@@ -28,17 +28,17 @@ public class WalletController {
         } catch (InsufficientFundsException | InvalidJsonException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (WalletNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.OK).body(e.getMessage());
         }
     }
 
-    @GetMapping("/{walletId}")
+    @GetMapping(value = "/api/v1/wallets/{walletId}")
     public ResponseEntity<?> getWallet(@PathVariable UUID walletId) {
         try {
             Wallet wallet = walletService.getWallet(walletId);
             return ResponseEntity.ok(wallet);
         } catch (WalletNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.OK).body(e.getMessage());
         }
     }
 }
