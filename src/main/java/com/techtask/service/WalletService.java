@@ -8,48 +8,57 @@ import com.techtask.model.Wallet;
 import com.techtask.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @Service
 @RequiredArgsConstructor
 public class WalletService {
     private final WalletRepository walletRepository;
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock readLock = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
 
-    @Async("threadPoolTaskExecutor")
-    @Transactional(rollbackFor = {InsufficientFundsException.class, InvalidOperationException.class, WalletNotFoundException.class},
-            isolation = Isolation.READ_COMMITTED)
     public void updateWalletBalance(UUID walletId, OperationType operationType, double amount) {
-        Wallet wallet = getWallet(walletId);
-
-        switch (operationType) {
-            case DEPOSIT:
-                wallet.deposit(amount);
-                break;
-            case WITHDRAW:
-                if (wallet.getBalance() < amount) {
-                    throw new InsufficientFundsException("Insufficient funds in the wallet");
-                }
-                wallet.withdraw(amount);
-                break;
-            default:
-                throw new InvalidOperationException("Invalid operation type");
-        }
-
+        writeLock.lock();
         try {
-            walletRepository.save(wallet);
-        } catch (DataAccessException ex) {
-            throw new InvalidOperationException("Error saving wallet changes");
+            Wallet wallet = getWallet(walletId);
+
+            switch (operationType) {
+                case DEPOSIT:
+                    wallet.deposit(amount);
+                    break;
+                case WITHDRAW:
+                    if (wallet.getBalance() < amount) {
+                        throw new InsufficientFundsException("Insufficient funds in the wallet");
+                    }
+                    wallet.withdraw(amount);
+                    break;
+                default:
+                    throw new InvalidOperationException("Invalid operation type");
+            }
+
+            try {
+                walletRepository.save(wallet);
+            } catch (DataAccessException ex) {
+                throw new InvalidOperationException("Error saving wallet changes");
+            }
+        } finally {
+            writeLock.unlock();
         }
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Wallet getWallet(UUID walletId) {
-        return walletRepository.findById(walletId)
-                .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
+        readLock.lock();
+        try {
+            return walletRepository.findById(walletId)
+                    .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
+        } finally {
+            readLock.unlock();
+        }
     }
 }
